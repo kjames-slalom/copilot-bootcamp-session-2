@@ -1,126 +1,275 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Container,
+  IconButton,
+  List,
+  ListItem,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
+
+const theme = createTheme({
+  palette: {
+    primary: { main: '#3F51B5' },
+    secondary: { main: '#03A9F4' },
+    background: { default: '#FFFFFF' },
+  },
+});
 
 function App() {
-  const [data, setData] = useState([]);
+  const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newItem, setNewItem] = useState('');
+  const [newTodo, setNewTodo] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
 
   useEffect(() => {
-    fetchData();
+    fetchTodos();
   }, []);
 
-  const fetchData = async () => {
+  const fetchTodos = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/items');
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
+      const response = await fetch('/api/todos');
+      if (!response.ok) throw new Error('Network response was not ok');
       const result = await response.json();
-      setData(result);
+      setTodos(result);
       setError(null);
     } catch (err) {
-      setError('Failed to fetch data: ' + err.message);
-      console.error('Error fetching data:', err);
+      setError('Failed to fetch todos: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
-    if (!newItem.trim()) return;
-
+    if (!newTodo.trim()) return;
     try {
-      const response = await fetch('/api/items', {
+      const response = await fetch('/api/todos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: newItem }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTodo }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to add item');
-      }
-
+      if (!response.ok) throw new Error('Failed to add todo');
       const result = await response.json();
-      setData([...data, result]);
-      setNewItem('');
+      setTodos([...todos, result]);
+      setNewTodo('');
+      setError(null);
     } catch (err) {
-      setError('Error adding item: ' + err.message);
-      console.error('Error adding item:', err);
+      setError('Error adding todo: ' + err.message);
     }
   };
 
-  const handleDelete = async (itemId) => {
+  const handleToggleComplete = async (todo) => {
     try {
-      const response = await fetch(`/api/items/${itemId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/todos/${todo.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: !todo.completed }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete item');
-      }
-
-      setData(data.filter(item => item.id !== itemId));
+      if (!response.ok) throw new Error('Failed to update todo');
+      const updated = await response.json();
+      setTodos(todos.map(t => (t.id === updated.id ? updated : t)));
       setError(null);
     } catch (err) {
-      setError('Error deleting item: ' + err.message);
-      console.error('Error deleting item:', err);
+      setError('Error updating todo: ' + err.message);
+    }
+  };
+
+  const handleEditStart = (todo) => {
+    setEditingId(todo.id);
+    setEditingName(todo.name);
+  };
+
+  const handleEditCancel = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const handleEditSave = async (id) => {
+    if (!editingName.trim()) return;
+    try {
+      const response = await fetch(`/api/todos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingName }),
+      });
+      if (!response.ok) throw new Error('Failed to update todo');
+      const updated = await response.json();
+      setTodos(todos.map(t => (t.id === updated.id ? updated : t)));
+      setEditingId(null);
+      setEditingName('');
+      setError(null);
+    } catch (err) {
+      setError('Error updating todo: ' + err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      const response = await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete todo');
+      setTodos(todos.filter(t => t.id !== id));
+      setError(null);
+    } catch (err) {
+      setError('Error deleting todo: ' + err.message);
     }
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>To Do App</h1>
-        <p>Keep track of your tasks</p>
-      </header>
+    <ThemeProvider theme={theme}>
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
+        <Container maxWidth="sm">
+          <Typography variant="h4" component="h1" align="center" color="primary" fontWeight="bold" gutterBottom>
+            To Do App
+          </Typography>
+          <Typography variant="subtitle1" align="center" color="text.secondary" sx={{ mb: 4 }}>
+            Keep track of your tasks
+          </Typography>
 
-      <main>
-        <section className="add-item-section">
-          <h2>Add New Item</h2>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              placeholder="Enter item name"
-            />
-            <button type="submit">Add Item</button>
-          </form>
-        </section>
+          <Card sx={{ mb: 3, borderRadius: 2 }} elevation={2}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Add New Task</Typography>
+              <Box component="form" onSubmit={handleAdd} sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={newTodo}
+                  onChange={(e) => setNewTodo(e.target.value)}
+                  placeholder="Enter task name"
+                  inputProps={{ 'aria-label': 'New task name' }}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}
+                >
+                  Add Task
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
 
-        <section className="items-section">
-          <h2>Items from Database</h2>
-          {loading && <p>Loading data...</p>}
-          {error && <p className="error">{error}</p>}
-          {!loading && !error && (
-            <ul>
-              {data.length > 0 ? (
-                data.map((item) => (
-                  <li key={item.id}>
-                    <span>{item.name}</span>
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="delete-btn"
-                      type="button"
-                    >
-                      Delete
-                    </button>
-                  </li>
-                ))
-              ) : (
-                <p>No items found. Add some!</p>
-              )}
-            </ul>
+          {error && (
+            <Typography color="error" role="alert" sx={{ mb: 2 }}>
+              {error}
+            </Typography>
           )}
-        </section>
-      </main>
-    </div>
+
+          <Card sx={{ borderRadius: 2 }} elevation={2}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Tasks</Typography>
+              {loading && <Typography>Loading data...</Typography>}
+              {!loading && todos.length === 0 && (
+                <Typography color="text.secondary">No todos found. Add some!</Typography>
+              )}
+              <List disablePadding>
+                {todos.map((todo) => (
+                  <ListItem
+                    key={todo.id}
+                    disableGutters
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 1,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': { borderBottom: 'none' },
+                      opacity: todo.completed ? 0.6 : 1,
+                    }}
+                  >
+                    <Checkbox
+                      checked={todo.completed}
+                      onChange={() => handleToggleComplete(todo)}
+                      color="primary"
+                      inputProps={{ 'aria-label': `Mark "${todo.name}" as ${todo.completed ? 'incomplete' : 'complete'}` }}
+                      sx={{ minWidth: 44, minHeight: 44 }}
+                    />
+                    {editingId === todo.id ? (
+                      <>
+                        <TextField
+                          size="small"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleEditSave(todo.id);
+                            if (e.key === 'Escape') handleEditCancel();
+                          }}
+                          inputProps={{ 'aria-label': 'Edit task name' }}
+                          sx={{ flex: 1 }}
+                          autoFocus
+                        />
+                        <IconButton
+                          onClick={() => handleEditSave(todo.id)}
+                          color="primary"
+                          aria-label="Save task"
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <SaveIcon />
+                        </IconButton>
+                        <IconButton
+                          onClick={handleEditCancel}
+                          aria-label="Cancel edit"
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <CancelIcon />
+                        </IconButton>
+                      </>
+                    ) : (
+                      <>
+                        <Typography
+                          sx={{
+                            flex: 1,
+                            fontSize: '1rem',
+                            fontWeight: 500,
+                            textDecoration: todo.completed ? 'line-through' : 'none',
+                            color: todo.completed ? 'text.secondary' : 'text.primary',
+                          }}
+                        >
+                          {todo.name}
+                        </Typography>
+                        <IconButton
+                          onClick={() => handleEditStart(todo)}
+                          color="secondary"
+                          aria-label={`Edit task "${todo.name}"`}
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          onClick={() => handleDelete(todo.id)}
+                          color="error"
+                          aria-label={`Delete task "${todo.name}"`}
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 }
 
